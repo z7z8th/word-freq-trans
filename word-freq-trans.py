@@ -11,6 +11,26 @@ from collections import Counter
 import odf.opendocument
 from pystardict import Dictionary
 
+star_dicts: list[Dictionary] = []
+
+def load_dicts():
+    dicts_dir = os.path.join(os.path.dirname(__file__))
+    verbose_dict = []
+    for d in glob.glob(os.path.join(dicts_dir, '*','*.ifo')):
+        dict_base_name = re.sub(r'.ifo$', '', d)
+        dict1 = Dictionary(dict_base_name, in_memory=True)
+        if '朗道' in dict1.ifo.bookname:  # definition too long, as last choice
+            verbose_dict.insert(0, dict1)
+        elif '牛津' in dict1.ifo.bookname:  # too verbose
+            verbose_dict.append(dict1)
+        else:
+            star_dicts.insert(0, dict1)  # prefer short definitions
+
+    star_dicts.extend(verbose_dict)
+    print(f'{len(star_dicts)} dict(s) loaded', [d.ifo.bookname for  d in star_dicts])
+
+load_dicts()
+
 def max_common_substring_all_concat(s1, s2, max_only = True):
     m, n = len(s1), len(s2)
     dp = [[0] * (n + 1) for _ in range(m + 1)]
@@ -54,26 +74,6 @@ def max_common_substring_all_concat(s1, s2, max_only = True):
 
 # print(max_common_substring_all_concat(s1, s2, True))
 
-
-star_dicts: list[Dictionary] = []
-
-def load_dicts():
-    dicts_dir = os.path.join(os.path.dirname(__file__))
-    verbose_dict = []
-    for d in glob.glob(os.path.join(dicts_dir, '*','*.ifo')):
-        dict_base_name = re.sub(r'.ifo$', '', d)
-        dict1 = Dictionary(dict_base_name, in_memory=True)
-        if '朗道' in dict1.ifo.bookname:  # definition too long, as last choice
-            verbose_dict.insert(0, dict1)
-        elif '牛津' in dict1.ifo.bookname:  # too verbose
-            verbose_dict.append(dict1)
-        else:
-            star_dicts.insert(0, dict1)  # prefer short definitions
-
-    star_dicts.extend(verbose_dict)
-    print(f'{len(star_dicts)} dict(s) loaded', [d.ifo.bookname for  d in star_dicts])
-
-load_dicts()
 
 import multiprocessing
 from multiprocessing import Process
@@ -170,7 +170,7 @@ def query_dicts(word: str, noguess = False):
     if gdef:
         return f"~= {word.capitalize()}\n{gdef}"
 
-    abbrexpand = [(r"'ll$", " will"), (r"n't$", " not"), (r"'d$", " would"), (r"-", "")]
+    abbrexpand = [(r"'ll$", " will"), (r"n't$", " not"), (r"'d$", " would"), (r"-+", " ")]
     for s, r in abbrexpand:
         if re.search(s, word):
             return re.sub(s, r, word)
@@ -181,7 +181,7 @@ def query_dicts(word: str, noguess = False):
     
     gword, gdef = query_dicts_ambiguously(word)
     if gword:
-        return f"~= {gword}\n{gdef}"
+        return f"~~~= {gword}\n{gdef}"
     
     print('No def: ', word)
     query_no_def_count = query_no_def_count + 1
@@ -292,7 +292,7 @@ def output_results_odf(word_freq, bookname):
     # ODF Standard section 15.9.1
     widthshort = Style(parent=textdoc.automaticstyles,
                     name='Wshort', family='table-column')
-    TableColumnProperties(parent=widthshort, columnwidth='1.7cm')  #
+    TableColumnProperties(parent=widthshort, columnwidth='1.3cm')  #
 
     widthmid = Style(parent=textdoc.automaticstyles,
                     name='Wmid', family='table-column')
@@ -318,21 +318,21 @@ def output_results_odf(word_freq, bookname):
     # table freq cell
     tcell = Style(parent=textdoc.automaticstyles,
                     name='Tcell', family='table-cell')
-    TableCellProperties(parent=tcell, textalignsource='fix', verticalalign='middle')
+    TableCellProperties(parent=tcell, textalignsource='fix', verticalalign='middle', wrapoption="wrap")
     ParagraphProperties(parent=tcell, textalign='center')
     TextProperties(parent=tcell, fontsize='12pt')
 
     # table word cell
     twordcell = Style(parent=textdoc.automaticstyles,
                     name='Twordcell', family='table-cell')
-    TableCellProperties(parent=twordcell, textalignsource='fix', verticalalign='middle')
+    TableCellProperties(parent=twordcell, textalignsource='fix', verticalalign='middle', wrapoption="wrap")
     ParagraphProperties(parent=twordcell, textalign='center')
     TextProperties(parent=twordcell, fontweight='bold', fontsize='12pt')
 
     # table def cell
     tdefcell = Style(parent=textdoc.automaticstyles,
                     name='Tdefcell', family='table-cell')
-    TableCellProperties(parent=tdefcell, textalignsource='fix', verticalalign='middle', padding='0.15cm')
+    TableCellProperties(parent=tdefcell, textalignsource='fix', verticalalign='middle', padding='0.15cm', wrapoption="wrap")
     ParagraphProperties(parent=tdefcell, textalign='left')
     TextProperties(parent=tdefcell, fontsize='12pt')
 

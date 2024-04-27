@@ -4,6 +4,11 @@
 *.stackdump
 
 *.ods
+*.xml
+*.rdf
+*.png
+mimetype
+
 
 *.txt
 *.pdf
