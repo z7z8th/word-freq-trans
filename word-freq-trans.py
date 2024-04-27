@@ -6,10 +6,16 @@ import sys
 import time
 import glob
 import re
+import math
 import traceback
 from collections import Counter
 import odf.opendocument
 from pystardict import Dictionary
+
+
+WORD_PER_PAGE = 500
+
+args = None
 
 star_dicts: list[Dictionary] = []
 
@@ -105,7 +111,7 @@ consumer_threads: list[Process] = []
 def start_consumers():
     # Get the number of CPU cores:
     cpu_count = multiprocessing.cpu_count()
-    print('print cpu count', cpu_count)
+    print('start consumers', cpu_count)
     # cpu_count = 8
     #  Create a queue to hold the data
     # multiprocessing.set_start_method('spawn', force=True)
@@ -190,7 +196,18 @@ def query_dicts(word: str, noguess = False):
 def read_txt_file(filename):
     with open(filename, 'r', encoding='utf-8') as f:
         text = f.read()
-    return text
+    
+    if len(args.pageids) == 0:
+        return text
+    words = re.split(r'\s+', text)
+    npages = math.ceil(len(words)/WORD_PER_PAGE)
+    print('npages', npages)
+    pages = []
+    for i in args.pageids:
+        if i <= npages:
+            print('reading page', i)
+            pages.extend(words[(i-1)*WORD_PER_PAGE : i*WORD_PER_PAGE])
+    return ' '.join(pages)
 
 import PyPDF2
 def read_pdf_file(filename):
@@ -198,10 +215,21 @@ def read_pdf_file(filename):
     reader = PyPDF2.PdfReader(filename)
 
     # print the number of pages in pdf file
-    print('pdf pages', len(reader.pages))
+    npages = len(reader.pages)
+    print('pdf total pages', npages)
 
-    textl = [ p.extract_text() for p in reader.pages]
-    return ''.join(textl)
+    text = []
+    if len(args.pageids) > 0:
+        for i in args.pageids:
+            if i <= npages:
+                print('reading page', i-1)
+                text.append(reader.pages[i-1].extract_text())
+    else:
+        text = [ reader.pages[i].extract_text() for i in range(npages) ]
+
+    ret = ''.join(text)
+    # print('ret', ret)
+    return ret
 
   # 读取txt文件
 def read_file(filename: str):
@@ -211,7 +239,7 @@ def read_file(filename: str):
     }
 
     _, ext = os.path.splitext(filename)
-    text = readers[ext[1:]](filename)
+    text = readers[ext and ext[1:] or 'txt'](filename)
     return text and text.lower()
 
 
@@ -369,23 +397,58 @@ def output_results_odf(word_freq, bookname):
 
 # query_dicts("that'll")
 
+
+import argparse
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-v", "--verbose", help="increase output verbosity")
+    parser.add_argument("-p", "--pages", help="page range, e.g. 1,2,5,9-12,20")
+    parser.add_argument("files", nargs="+", help="input files")
+    args = parser.parse_args()
+
+    if args.verbose:
+        print("Verbose mode enabled!")
+
+    args.pageids = []
+    if args.pages:
+        for rg in args.pages.split(','):
+            prange = rg.split("-")
+            print('page range', prange)
+            if len(prange) == 1:
+                args.pageids.append(int(prange[0]))
+            else:
+                args.pageids.extend([ i for i in range(int(prange[0]), int(prange[1])+1) ])
+        args.pageids = set(args.pageids)
+    print('page ids', args.pageids)
+
+    print('input files', args.files)
+    return args
+
+
 # 主函数
 if __name__ == '__main__':
     exit_code = 0
     try:
-        filename = len(sys.argv) > 1 and sys.argv[1] or 'daniel-defoe_robinson-crusoe.pdf'  #'book.txt'  # Replace with your file name
-        bookname, _ = os.path.splitext(os.path.basename(filename))
-        bookname = re.sub(r'[-.]', ' ', bookname)
-        bookname = re.sub(r'[_]', ' - ', bookname)
-        
-        text = read_file(filename)
-        word_freq = count_words(text)
-
+        args = parse_args()
         start_consumers()
-        output_results_odf(get_word_defs(word_freq), bookname=bookname.title())
-        print('query_no_def_count', query_no_def_count)
+        for filename in args.files:
+            # filename = len(sys.argv) > 1 and sys.argv[1] or 'daniel-defoe_robinson-crusoe.pdf'  #'book.txt'  # Replace with your file name
+            bookname, _ = os.path.splitext(os.path.basename(filename))
+            bookname = re.sub(r'[-.]', ' ', bookname)
+            bookname = re.sub(r'[_]', ' - ', bookname)
+
+            if args.pages:
+                bookname += ' - ' + args.pages
+            
+            text = read_file(filename)
+            word_freq = count_words(text)
+
+            output_results_odf(get_word_defs(word_freq), bookname=bookname.title())
+            print('query_no_def_count', query_no_def_count)
     except KeyboardInterrupt:
         exit_code = -2
+    except Exception as e:
+        print(e, traceback.format_exc())
     finally:
         shutdown_consumers()
         os._exit(exit_code)
