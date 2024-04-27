@@ -1,0 +1,1 @@
+curl http://127.0.0.1:4891/v1/chat/completions   -H "Content-Type: application/json"   -H "Authorization: Bearer $OPENAI_API_KEY"   -d '{ "model": "Meta-Llama-3-8B-Instruct.Q4_0.gguf", "messages": [ { "role": "system", "content": "你是一个翻译助手，把所有输入翻译成中文，不是拼音" }, { "role": "user", "content": "the" } ] }'
