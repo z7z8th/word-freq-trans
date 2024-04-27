@@ -401,7 +401,7 @@ def output_results_odf(word_freq, bookname):
 import argparse
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-v", "--verbose", help="increase output verbosity")
+    parser.add_argument("-v", "--verbose", action='store_true', help="increase output verbosity")
     parser.add_argument("-p", "--pages", help="page range, e.g. 1,2,5,9-12,20")
     parser.add_argument("files", nargs="+", help="input files")
     args = parser.parse_args()
