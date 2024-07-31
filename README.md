@@ -1,6 +1,14 @@
-# Get word frequency and definition of a book for english learning.
+# Get word definition for English learning
 
-# usage
+Output word frequency along with word definition
+
+## Supported file types
+
+* .txt
+* .pdf
+* .srt
+
+## usage
 
 ```sh
 apt install pipenv
@@ -9,16 +17,26 @@ pip install -r requirements.txt
 ```
 
 ```sh
-usage: ./word-freq-trans.py [-h] [-v VERBOSE] [-p PAGES] files [files ...]
+3 dict(s) loaded ['懒虫简明英汉词典', '朗道英汉字典5.0', '牛津英汉双解美化版']
+usage: word-freq-trans.py [-h] [-v] [-p PAGES] [-t TIME]
+                          [-o OUTPUT] [-c]
+                          files [files ...]
 
 positional arguments:
   files                 input files
 
 options:
   -h, --help            show this help message and exit
-  -v VERBOSE, --verbose VERBOSE
-                        increase output verbosity
+  -v, --verbose         increase output verbosity
   -p PAGES, --pages PAGES
                         page range, e.g. 1,2,5,9-12,20
-
+  -t TIME, --time TIME  srt subs time range, e.g. 00:00:00-00:10:00
+  -o OUTPUT, --output OUTPUT
+                        output to file
+  -c, --combine         combine definition with srt content
 ```
+
+## Screenshots
+
+![word def ods](image/word-def-ods.png)
+![word def srt](image/word-def-srt.png)

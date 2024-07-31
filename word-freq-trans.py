@@ -381,7 +381,7 @@ def proc_word_defs_subs(subs, bookname):
         word_freq = count_words(s.content)
         wdefl = get_word_defs(word_freq, False)
 
-        s.content = f'<font color="yellow">{s.content}</font>\n<font size="40px">{word_defs_to_text(wdefl)}</font>'
+        s.content = f'<font color="yellow">{s.content}</font>\n<font size="30px">{word_defs_to_text(wdefl)}</font>'
 
     bookname += '.srt'
     with open(bookname, 'w+', encoding='utf-8') as f:
@@ -514,7 +514,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-v", "--verbose", action='store_true', help="increase output verbosity")
     parser.add_argument("-p", "--pages", help="page range, e.g. 1,2,5,9-12,20")
-    parser.add_argument("-t", "--time", help="time range, e.g. 00:00:00-00:10:00")
+    parser.add_argument("-t", "--time", help="srt subs time range, e.g. 00:00:00-00:10:00")
     parser.add_argument("-o", "--output", help="output to file")
     parser.add_argument("-c", "--combine", action='store_true', help="combine definition with srt content")
     parser.add_argument("files", nargs="+", help="input files")
