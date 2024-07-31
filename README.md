@@ -2,13 +2,18 @@
 
 Output word frequency along with word definition
 
-## Supported file types
+## Supported input file types
 
 * .txt
 * .pdf
 * .srt
 
-## usage
+## Output file types
+
+* .ods
+* .srt (Note: Only if input is .srt and option `-c` is used, Use VLC to play the generated .srt)
+
+## Usage
 
 ```sh
 apt install pipenv
