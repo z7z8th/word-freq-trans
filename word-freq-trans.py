@@ -7,6 +7,7 @@ import time
 import glob
 import re
 import math
+import json
 import traceback
 from collections import Counter
 import odf.opendocument
@@ -80,6 +81,30 @@ def max_common_substring_all_concat(s1, s2, max_only = True):
 
 # print(max_common_substring_all_concat(s1, s2, True))
 
+class word_def_cache():
+    def __init__(self, fname = None):
+        self.cc_file = fname or 'word_def_cache.json'
+        try:
+            self.load()
+        except:
+            self.cc = {}
+
+    def load(self):
+        with open(self.cc_file, 'r', encoding='utf-8') as f:
+            self.cc = json.load(f)
+
+    def save(self):
+        with open(self.cc_file, 'w+', encoding='utf-8') as f:
+             json.dump(self.cc, f, ensure_ascii=False)
+
+    def add(self, k, v):
+        self.cc[k] = v
+
+    def query(self, k):
+        if k in self.cc:
+            return self.cc[k]
+
+wdcc = word_def_cache()
 
 import multiprocessing
 from multiprocessing import Process
@@ -87,12 +112,14 @@ from multiprocessing import Value
 import queue
 
 def consumer(name, input_queue, output_queue, consumer_exit):
+
     while not consumer_exit.value:
         try:
             # Consume data from the queue
             word, freq = input_queue.get(block=True, timeout=1)
             # print(f"{name} consumed: {dw, word}")
-            output_queue.put((word, freq, query_dicts(word)))
+            wdef = query_dicts(word)
+            output_queue.put((word, freq, wdef))
         except queue.Empty:
             # No more items in the queue, exit the loop
             # print('Empty')
@@ -124,6 +151,7 @@ def start_consumers():
 #  Wait for all consumer_threads to finish
 def shutdown_consumers():
     print('shutdown_consumers')
+    wdcc.save()
     consumer_exit.value = True
     # time.sleep(2)
     for t in consumer_threads:
@@ -236,27 +264,37 @@ import srt
 def time_to_delta(x):
     return datetime.timedelta(hours=x.hour, minutes=x.minute, seconds=x.second, microseconds=x.microsecond)
 
-def read_srt_file(filename):
+def read_srt_file(filename, ret_obj=False):
     with open(filename, 'r', encoding='utf-8') as f:
         text = f.read()
 
+    subs = srt.parse(text)
+
     if len(args.time_range) == 0:
-        return text
+        if ret_obj:
+            return  subs
+        else:
+            return text
+
     for i,t in enumerate(args.time_range):
         args.time_range[i] = time_to_delta(t)
 
     [start, end] = args.time_range
     print(f'time range {start} - {end}')
 
-    subs = srt.parse(text)
-    part = []
-    ret = ''
+    sub_part = []
+    text = ''
     for s in subs:
         if s.start > start and s.start < end:
-            part.append(s)
-            ret += s.content
-    # TODO: write part to file
-    return ret
+            sub_part.append(s)
+            text += s.content
+        if s.start > end:
+            break
+
+    if ret_obj:
+        return  sub_part
+    else:
+        return text
 
   # 读取txt文件
 def read_file(filename: str):
@@ -287,14 +325,18 @@ def count_words(text: str):
 def format_def(wdef: str):
     return wdef and re.sub(r'([a-zA-Z]+\.)[\r\n]+', r'\1 ', wdef)
 
-def get_word_defs(word_freq:Counter):
+def get_word_defs(word_freq:Counter, close_queue=True):
     wdeflist = []
     qcnt = 0
     for word, freq in word_freq.most_common():
         if re.match(r'^\s*(\d+|\w)\s*$', word):
             continue
-        input_queue.put((word, freq))
-        qcnt += 1
+        wdef = wdcc.query(word)
+        if not wdef:
+            input_queue.put((word, freq))
+            qcnt += 1
+        else:
+            wdeflist.append((word, freq, wdef))
         # if qcnt > 100: break
 
     i = 0
@@ -302,16 +344,37 @@ def get_word_defs(word_freq:Counter):
         try:
             word, freq, wdef = output_queue.get(block=True, timeout=1)
             i += 1
-            wdef =  format_def(wdef) or f'No definition found for {word}'
+            wdef = format_def(wdef) or f'No definition found for {word}'
+            wdcc.add(word, wdef)
             wdeflist.append((word, freq, wdef))
         except queue.Empty:
             time.sleep(0.1)
 
-
-    input_queue.close()
-    output_queue.close()
+    if close_queue:
+        input_queue.close()
+        output_queue.close()
     return wdeflist
   # 输出结果
+
+def word_defs_to_text(wdeflist):
+    text = ''
+    for word, freq, wdef in wdeflist:
+        wdef = wdef.replace('\n', '; ')
+        text += f'\n<b>{word}</b>\n{wdef}\n'
+    return text
+
+def proc_word_defs_subs(subs, bookname):
+    for s in subs:
+        word_freq = count_words(s.content)
+        wdefl = get_word_defs(word_freq, False)
+        s.content += '\n' + word_defs_to_text(wdefl)
+
+    bookname += '.srt'
+    with open(bookname, 'w+') as f:
+        f.write(srt.compose(subs))
+        print('result written to', bookname)
+
+
 # import openpyxl
 
 # def output_results_xlsx(word_freq):
@@ -435,6 +498,7 @@ def parse_args():
     parser.add_argument("-v", "--verbose", action='store_true', help="increase output verbosity")
     parser.add_argument("-p", "--pages", help="page range, e.g. 1,2,5,9-12,20")
     parser.add_argument("-t", "--time", help="time range, e.g. 00:00:00-00:10:00")
+    parser.add_argument("-c", "--combine", action='store_true', help="combine definition with srt content")
     parser.add_argument("files", nargs="+", help="input files")
     args = parser.parse_args()
 
@@ -479,14 +543,21 @@ if __name__ == '__main__':
             bookname = re.sub(r'[-.]', ' ', bookname)
             bookname = re.sub(r'[_]', ' - ', bookname)
 
-            if args.pages:
-                bookname += ' - ' + args.pages
+            if args.combine and filename.endswith('.srt'):
+                bookname += ' - defs - '
+                if args.time:
+                    bookname += args.time.replace(':', '_')
+                sub_part = read_srt_file(filename, True)
+                proc_word_defs_subs(sub_part, bookname)
+            else:
+                if args.pages:
+                    bookname += ' - ' + args.pages
 
-            text = read_file(filename)
-            word_freq = count_words(text)
+                text = read_file(filename)
+                word_freq = count_words(text)
 
-            output_results_odf(get_word_defs(word_freq), bookname=bookname.title())
-            print('query_no_def_count', query_no_def_count)
+                output_results_odf(get_word_defs(word_freq), bookname=bookname.title())
+                print('query_no_def_count', query_no_def_count)
     except KeyboardInterrupt:
         exit_code = -2
     except Exception as e:
