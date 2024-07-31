@@ -193,6 +193,11 @@ def query_dicts(word: str, noguess = False):
     if noguess:
         return ''
 
+    if word == word.capitalize():
+        gdef = query_dicts(word.lower(), True)
+        if gdef:
+            return f"~= {word.lower()}\n{gdef}"
+
     suffix = [('ied', 'y'), ('ies', 'y'), ('iest', 'y'), ('est', ''), ('er', ''), ('er', 'e'), ('ed', ''), ('ed', 'e'), ('ing', ''), ('ing', 'e'), ('s', ''), ('es', 'e'), ('es', ''), ("'s", "")]
     for s, r in suffix:
         gword = re.sub(f'{s}$', r, word)
@@ -212,6 +217,10 @@ def query_dicts(word: str, noguess = False):
     gdef = query_dicts(word.upper(), True)
     if gdef:
         return f"~= {word.upper()}\n{gdef}"
+
+    gdef = query_dicts(word.lower(), True)
+    if gdef:
+        return f"~= {word.lower()}\n{gdef}"
 
     gword, gdef = query_dicts_ambiguously(word)
     if gword:
@@ -268,11 +277,14 @@ def read_srt_file(filename, ret_obj=False):
     with open(filename, 'r', encoding='utf-8') as f:
         text = f.read()
 
+    # subs is a generator
     subs = srt.parse(text)
 
     if len(args.time_range) == 0:
+        print('use whole srt file')
         if ret_obj:
-            return  subs
+            # make a copy
+            return [ x for x in subs]
         else:
             return text
 
@@ -360,18 +372,21 @@ def word_defs_to_text(wdeflist):
     text = ''
     for word, freq, wdef in wdeflist:
         wdef = wdef.replace('\n', '; ')
-        text += f'\n<b>{word}</b>\n{wdef}\n'
+        text += f'\n<b>{word}</b> : {wdef}\n'
     return text
 
 def proc_word_defs_subs(subs, bookname):
     for s in subs:
+        # print('s', s.content)
         word_freq = count_words(s.content)
         wdefl = get_word_defs(word_freq, False)
-        s.content += '\n' + word_defs_to_text(wdefl)
+
+        s.content = f'<font color="yellow">{s.content}</font>\n<font size="40px">{word_defs_to_text(wdefl)}</font>'
 
     bookname += '.srt'
-    with open(bookname, 'w+') as f:
-        f.write(srt.compose(subs))
+    with open(bookname, 'w+', encoding='utf-8') as f:
+        txt = srt.compose(subs)
+        f.write(txt)
         print('result written to', bookname)
 
 
@@ -544,9 +559,9 @@ if __name__ == '__main__':
             bookname = re.sub(r'[_]', ' - ', bookname)
 
             if args.combine and filename.endswith('.srt'):
-                bookname += ' - defs - '
+                bookname += ' - defs'
                 if args.time:
-                    bookname += args.time.replace(':', '_')
+                    bookname += ' - ' + args.time.replace(':', '_')
                 sub_part = read_srt_file(filename, True)
                 proc_word_defs_subs(sub_part, bookname)
             else:
