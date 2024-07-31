@@ -499,7 +499,9 @@ def output_results_odf(word_freq, bookname):
             P(parent=tc, text=txt)
         n = n+1
         # if i>10: break
-    ofile = f'{bookname}.ods'
+    ofile = bookname
+    if not ofile.endswith('.ods'):
+        ofile += '.ods'
     textdoc.save(ofile)
     print(f'total {n} words')
     print(f"word freq and defs outputed to '{ofile}'")
@@ -513,6 +515,7 @@ def parse_args():
     parser.add_argument("-v", "--verbose", action='store_true', help="increase output verbosity")
     parser.add_argument("-p", "--pages", help="page range, e.g. 1,2,5,9-12,20")
     parser.add_argument("-t", "--time", help="time range, e.g. 00:00:00-00:10:00")
+    parser.add_argument("-o", "--output", help="output to file")
     parser.add_argument("-c", "--combine", action='store_true', help="combine definition with srt content")
     parser.add_argument("files", nargs="+", help="input files")
     args = parser.parse_args()
@@ -557,13 +560,13 @@ if __name__ == '__main__':
             bookname, _ = os.path.splitext(os.path.basename(filename))
             bookname = re.sub(r'[-.]', ' ', bookname)
             bookname = re.sub(r'[_]', ' - ', bookname)
+            bookname += ' - defs'
 
             if args.combine and filename.endswith('.srt'):
-                bookname += ' - defs'
                 if args.time:
                     bookname += ' - ' + args.time.replace(':', '_')
                 sub_part = read_srt_file(filename, True)
-                proc_word_defs_subs(sub_part, bookname)
+                proc_word_defs_subs(sub_part, args.output or bookname)
             else:
                 if args.pages:
                     bookname += ' - ' + args.pages
@@ -571,7 +574,7 @@ if __name__ == '__main__':
                 text = read_file(filename)
                 word_freq = count_words(text)
 
-                output_results_odf(get_word_defs(word_freq), bookname=bookname.title())
+                output_results_odf(get_word_defs(word_freq), bookname=args.output or bookname.title())
                 print('query_no_def_count', query_no_def_count)
     except KeyboardInterrupt:
         exit_code = -2
