@@ -164,14 +164,14 @@ def query_dicts(word: str, noguess = False):
 
     if noguess:
         return ''
-    
+
     suffix = [('ied', 'y'), ('ies', 'y'), ('iest', 'y'), ('est', ''), ('er', ''), ('er', 'e'), ('ed', ''), ('ed', 'e'), ('ing', ''), ('ing', 'e'), ('s', ''), ('es', 'e'), ('es', ''), ("'s", "")]
-    for s, r in suffix: 
+    for s, r in suffix:
         gword = re.sub(f'{s}$', r, word)
         gdef = query_dicts(gword, True)
         if gdef:
             return f"~= {gword}\n{gdef}"
-    
+
     gdef = query_dicts(word.capitalize(), True)
     if gdef:
         return f"~= {word.capitalize()}\n{gdef}"
@@ -180,15 +180,15 @@ def query_dicts(word: str, noguess = False):
     for s, r in abbrexpand:
         if re.search(s, word):
             return re.sub(s, r, word)
-        
+
     gdef = query_dicts(word.upper(), True)
     if gdef:
         return f"~= {word.upper()}\n{gdef}"
-    
+
     gword, gdef = query_dicts_ambiguously(word)
     if gword:
         return f"~~~= {gword}\n{gdef}"
-    
+
     print('No def: ', word)
     query_no_def_count = query_no_def_count + 1
     return ' '
@@ -196,7 +196,7 @@ def query_dicts(word: str, noguess = False):
 def read_txt_file(filename):
     with open(filename, 'r', encoding='utf-8') as f:
         text = f.read()
-    
+
     if len(args.pageids) == 0:
         return text
     words = re.split(r'\s+', text)
@@ -239,7 +239,10 @@ def read_file(filename: str):
     }
 
     _, ext = os.path.splitext(filename)
-    text = readers[ext and ext[1:] or 'txt'](filename)
+    ft = ext and ext[1:] or 'txt'
+    if ft not in readers:
+        ft = 'txt'
+    text = readers[ft](filename)
     return text and text.lower()
 
 
@@ -439,7 +442,7 @@ if __name__ == '__main__':
 
             if args.pages:
                 bookname += ' - ' + args.pages
-            
+
             text = read_file(filename)
             word_freq = count_words(text)
 
