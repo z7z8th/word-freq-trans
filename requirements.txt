@@ -1,3 +1,4 @@
 pystardict
 odfpy
 pypdf2
+srt

@@ -11,7 +11,7 @@ import traceback
 from collections import Counter
 import odf.opendocument
 from pystardict import Dictionary
-
+import datetime
 
 WORD_PER_PAGE = 500
 
@@ -231,11 +231,39 @@ def read_pdf_file(filename):
     # print('ret', ret)
     return ret
 
+import srt
+
+def time_to_delta(x):
+    return datetime.timedelta(hours=x.hour, minutes=x.minute, seconds=x.second, microseconds=x.microsecond)
+
+def read_srt_file(filename):
+    with open(filename, 'r', encoding='utf-8') as f:
+        text = f.read()
+
+    if len(args.time_range) == 0:
+        return text
+    for i,t in enumerate(args.time_range):
+        args.time_range[i] = time_to_delta(t)
+
+    [start, end] = args.time_range
+    print(f'time range {start} - {end}')
+
+    subs = srt.parse(text)
+    part = []
+    ret = ''
+    for s in subs:
+        if s.start > start and s.start < end:
+            part.append(s)
+            ret += s.content
+    # TODO: write part to file
+    return ret
+
   # 读取txt文件
 def read_file(filename: str):
     readers = {
         'txt': read_txt_file,
         'pdf': read_pdf_file,
+        'srt': read_srt_file,
     }
 
     _, ext = os.path.splitext(filename)
@@ -406,6 +434,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-v", "--verbose", action='store_true', help="increase output verbosity")
     parser.add_argument("-p", "--pages", help="page range, e.g. 1,2,5,9-12,20")
+    parser.add_argument("-t", "--time", help="time range, e.g. 00:00:00-00:10:00")
     parser.add_argument("files", nargs="+", help="input files")
     args = parser.parse_args()
 
@@ -423,6 +452,16 @@ def parse_args():
                 args.pageids.extend([ i for i in range(int(prange[0]), int(prange[1])+1) ])
         args.pageids = set(args.pageids)
     print('page ids', args.pageids)
+
+    args.time_range = []
+    if args.time:
+        rg = args.time.split('-')
+        if len(rg) != 2:
+            raise Exception(f'time range is not correct {args.time}')
+        for i,t in enumerate(rg):
+            args.time_range.append(datetime.time.fromisoformat(t))
+
+        print('time_range', [ x.isoformat() for x in args.time_range ])
 
     print('input files', args.files)
     return args
